@@ -1,27 +1,131 @@
 const electron = require("electron"),
   path = require("path"),
-  url = require("url");
+  url = require("url"),
+  getPort = require("get-port"),
+  mycoin = require("./basecoin/src/server");
 
-const { app, BrowserWindow } = electron;
+getPort().then(port => {
+  const server = mycoin.app.listen(port, () => {
+    console.log(`Running blockchain node on: http://localhost:${port}`);
+  });
+  mycoin.startP2PServer(server);
+  global.sharedPort = port;
+});
+
+const { app, BrowserWindow, Menu } = electron;
 
 let mainWindow;
 
-createWindow = () => {
+const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     resizable: false,
-    title: "MyCoin Wallet"
+    title: "Hicoin Wallet"
   });
-  mainWindow.loadURL(
-    url.format({
-      pathname: path.join(__dirname, "index.html"),
-      protocol: "file",
-      slashes: true
-    })
-  );
 
-  mainWindow.on("close", () => {
+  const ENV = process.env.ENV;
+
+  const template = [
+    {
+      label: "Hicoin Wallet",
+      submenu: [
+        {
+          label: "About Hicoin Wallet",
+          role: "about"
+        },
+        {
+          type: "separator"
+        },
+        {
+          label: "Services",
+          role: "services",
+          submenu: []
+        },
+        {
+          type: "separator"
+        },
+        {
+          label: "Hide Hicoin Wallet",
+          accelerator: "Command+H",
+          role: "hide"
+        },
+        {
+          label: "Hide Others",
+          accelerator: "Command+Shift+H",
+          role: "hideothers"
+        },
+        {
+          label: "Show All",
+          role: "unhide"
+        },
+        {
+          type: "separator"
+        },
+        {
+          label: "Quit",
+          accelerator: "Command+Q",
+          click: function() {
+            app.quit();
+          }
+        }
+      ]
+    },
+    {
+      label: "Edit",
+      submenu: [
+        {
+          label: "Undo",
+          accelerator: "CmdOrCtrl+Z",
+          role: "undo"
+        },
+        {
+          label: "Redo",
+          accelerator: "Shift+CmdOrCtrl+Z",
+          role: "redo"
+        },
+        {
+          type: "separator"
+        },
+        {
+          label: "Cut",
+          accelerator: "CmdOrCtrl+X",
+          role: "cut"
+        },
+        {
+          label: "Copy",
+          accelerator: "CmdOrCtrl+C",
+          role: "copy"
+        },
+        {
+          label: "Paste",
+          accelerator: "CmdOrCtrl+V",
+          role: "paste"
+        },
+        {
+          label: "Select All",
+          accelerator: "CmdOrCtrl+A",
+          role: "selectall"
+        }
+      ]
+    }
+  ];
+
+  if (ENV === "dev") {
+    mainWindow.loadURL("http://localhost:3000");
+    mainWindow.webContents.openDevTools();
+  } else {
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    mainWindow.loadURL(
+      url.format({
+        pathname: path.join(__dirname, "build/index.html"),
+        protocol: "file",
+        slashes: true
+      })
+    );
+  }
+
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 };
@@ -31,9 +135,11 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+
 app.on("activate", () => {
   if (mainWindow === null) {
     createWindow();
   }
 });
+
 app.on("ready", createWindow);
